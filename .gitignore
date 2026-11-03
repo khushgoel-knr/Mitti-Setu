@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.vercel/
+.env*
+!.env.example
+*.sqlite*
+*.db*
+.test-data/
+*.log
+*.tsbuildinfo
+next-env.d.ts
