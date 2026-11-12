@@ -4,6 +4,22 @@ import {createClient} from '@libsql/client';
 import {databaseAdapter,migrate} from '../lib/database.mjs';
 import {databaseConfig,databaseFailure} from '../lib/database-errors.mjs';
 import {validEmail,normalizePhone} from '../lib/validation.mjs';
+test('requested listing removal is exact, idempotent and preserves accepted trade history',async()=>{
+ const client=createClient({url:':memory:'});
+ try{
+  await migrate(client);
+  await client.execute('DELETE FROM mitti_migrations WHERE version=3');
+  await client.execute("INSERT INTO users(id,name,email,role,created) VALUES('owner','Local fixture','fixture@gmail.com','farmer',1)");
+  const id='657af0ce-bfa3-4789-9081-cc201571aa7c';
+  for(const cropId of [id,'other-crop'])await client.execute({sql:"INSERT INTO crops(id,owner_id,name,kind,category,qty,price,place,created) VALUES(?,'owner','tomato','other','vegetables',6578,76800,'manglagiri',1)",args:[cropId]});
+  for(const [offerId,cropId,status]of [['pending',id,'pending'],['accepted',id,'accepted'],['other-offer','other-crop','pending']])await client.execute({sql:"INSERT INTO offers(id,crop_id,buyer_id,qty,price,transport,handling,status,created) VALUES(?,?,'owner',1,76800,0,0,?,1)",args:[offerId,cropId,status]});
+  await migrate(client);await migrate(client);
+  const crops=await client.execute('SELECT id,archived,revision,qty FROM crops ORDER BY id');
+  assert.deepEqual(crops.rows.map(r=>[r.id,r.archived,r.revision,r.qty]),[[id,1,2,6578],['other-crop',0,1,6578]]);
+  const offers=await client.execute('SELECT id,status FROM offers ORDER BY id');
+  assert.deepEqual(offers.rows.map(r=>[r.id,r.status]),[['accepted','accepted'],['other-offer','pending'],['pending','declined']]);
+ }finally{client.close()}
+});
 test('Gmail/SRM domains and Indian contact normalization',()=>{
  for(const email of ['name@gmail.com','name@srmap.edu.in','student_123@SRMAP.EDU.IN'])assert.equal(validEmail(email),true,email);
  for(const email of ['name@gmail.com.attacker.com','name@srmap.edu.in.evil','@gmail.com','name@example.com','a@@gmail.com'])assert.equal(validEmail(email),false,email);
