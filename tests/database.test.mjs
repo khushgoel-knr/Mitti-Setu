@@ -5,6 +5,26 @@ import {databaseAdapter,migrate} from '../lib/database.mjs';
 import {databaseConfig,databaseFailure} from '../lib/database-errors.mjs';
 import {validEmail,normalizePhone} from '../lib/validation.mjs';
 import {cropMetadata,estimateLegacyQuality} from '../lib/crop-metadata.mjs';
+
+test('seller rating migration keeps the latest buyer rating and demo scores separate and stable',async()=>{
+ const client=createClient({url:':memory:'});
+ try{
+  await migrate(client);
+  await client.batch(['DROP TABLE seller_ratings','DROP TABLE seller_demo_scores','DELETE FROM mitti_migrations WHERE version=5'],'write');
+  for(const [id,role]of [['seller','farmer'],['buyer','buyer'],['sample-farmer','farmer']])await client.execute({sql:'INSERT INTO users(id,name,email,role,created) VALUES(?,?,?,?,1)',args:[id,id,id+'@gmail.com',role]});
+  await client.execute("INSERT INTO crops(id,owner_id,name,kind,category,qty,price,place,created) VALUES('crop','seller','Rice','rice','grains',10,1000,'Guntur',1)");
+  for(const [id,rating,updated]of [['old',5,1],['new',0,2]]){
+   await client.execute({sql:"INSERT INTO offers(id,crop_id,buyer_id,qty,price,transport,handling,status,created) VALUES(?,'crop','buyer',1,1000,0,0,'accepted',1)",args:[id]});
+   await client.execute({sql:"INSERT INTO seller_reviews VALUES(?,'seller','buyer',?,'review',1,?)",args:[id,rating,updated]});
+  }
+  await migrate(client);
+  assert.deepEqual((await client.execute('SELECT seller_id,buyer_id,rating FROM seller_ratings')).rows.map(r=>[r.seller_id,r.buyer_id,r.rating]),[['seller','buyer',0]]);
+  const demo=(await client.execute('SELECT * FROM seller_demo_scores')).rows;
+  assert.equal(demo.length,1);assert.equal(demo[0].seller_id,'seller');assert.ok(demo[0].score>=3.5&&demo[0].score<=4.9);
+  await assert.rejects(client.execute("INSERT INTO seller_ratings VALUES('seller','buyer',4,'duplicate',1,3)"),/UNIQUE/);
+  await migrate(client);assert.deepEqual((await client.execute('SELECT * FROM seller_demo_scores')).rows,demo);
+ }finally{client.close()}
+});
 test('quality and crop dates reject invalid values, future dates and reversed chronology',()=>{
  const valid={quality:0,cultivatedDate:'2024-02-29',harvestedDate:'2024-03-01'};
  assert.deepEqual(cropMetadata(valid),{quality:0,quality_source:'farmer',cultivated_date:'2024-02-29',harvested_date:'2024-03-01'});

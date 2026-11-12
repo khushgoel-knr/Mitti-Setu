@@ -44,6 +44,25 @@ assert.equal(rated.quality,88);assert.equal(rated.quality_source,'farmer');asser
 await b(`/api/offers/${o.id}/review`,'POST',{rating:0,comment:'Updated review',received:true});
 rated=(await visitor('/api/state')).crops.find(c=>c.id===id);assert.equal(rated.trust_score,0);assert.equal(rated.rating_count,1);
 assert.equal((await f('/api/state')).user.rating_count,1);
+const sellerId=rated.owner_id,ratingUrl=`/api/sellers/${sellerId}/rating`;
+await visitor(ratingUrl,'POST',{rating:5},401);
+await f(ratingUrl,'POST',{rating:5},403);
+await b('/api/sellers/sample-farmer/rating','POST',{rating:5},404);
+await b(ratingUrl,'POST',{rating:2.5},400);
+await other(ratingUrl,'POST',{rating:2,comment:'Direct marketplace review'});
+rated=(await visitor('/api/state')).crops.find(c=>c.id===id);assert.equal(rated.trust_score,1);assert.equal(rated.rating_count,2);
+await b(ratingUrl,'POST',{rating:4,comment:'One buyer, one farmer'});
+rated=(await visitor('/api/state')).crops.find(c=>c.id===id);assert.equal(rated.trust_score,3);assert.equal(rated.rating_count,2);
+assert.equal((await b('/api/state')).crops.find(c=>c.id===id).my_rating,4);
+assert.equal((await other('/api/state')).crops.find(c=>c.id===id).my_rating,2);
+assert.equal(rated.my_rating,null);assert.equal(rated.my_review,null);
+const secondCrop=await f('/api/crops','POST',{...crop,name:'Another batch'},201);
+assert.equal((await b('/api/state')).crops.find(c=>c.id===secondCrop.id).my_rating,4);
+await b(ratingUrl,'POST',{rating:5});
+const both=(await visitor('/api/state')).crops.filter(c=>c.owner_id===sellerId);
+assert.ok(both.every(c=>c.trust_score===3.5&&c.rating_count===2));
+await f(`/api/crops/${secondCrop.id}/archive`,'POST',{revision:1});
+
 await f('/api/crops/'+id,'PATCH',{...crop,quality:91,revision:2});
 assert.equal((await visitor('/api/state')).crops.find(c=>c.id===id).quality,91);
 await f('/api/care/reports','POST',{crop:'Tomato',symptom:0,days:3,notes:'local test',urgent:false},201);
