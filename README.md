@@ -10,7 +10,7 @@ Farmer-to-buyer marketplace created by Sherlock Homies for SRM AP Sociothon. Thi
 4. Deploy, or redeploy after adding/changing variables. The first API request creates the initial tables and twelve clearly labelled sample listings. Open `/api/health` on the new site: it should return `{"ok":true,"database":true}`. Then test signup, login, adding a crop, sending an offer, and confirming acceptance with separate test accounts.
 5. GitHub stores your source. Vercel builds and hosts it; pushes to the production branch trigger a new deployment. The database persists separately in Turso.
 
-The optional `PLANT_ID_API_KEY` enables Kindwise photo diagnosis when configured. Guided crop care works without it. Do not set this to a made-up key.
+The optional `GEMINI_API_KEY` from Google AI Studio enables crop-photo assessments. Set `GEMINI_MODEL` to an available image-capable model (default `gemini-3.5-flash-lite`). Store keys in Vercel environment variables, never browser code. Google free-tier quota limits apply and free-tier inputs may be used to improve Google services; the upload page discloses this. `PLANT_ID_API_KEY` remains supported as an alternative when Gemini is not configured. Guided crop care works without it. Do not set this to a made-up key.
 
 ## Local development of this edition
 
