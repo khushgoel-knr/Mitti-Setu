@@ -4,6 +4,26 @@ import {createClient} from '@libsql/client';
 import {databaseAdapter,migrate} from '../lib/database.mjs';
 import {databaseConfig,databaseFailure} from '../lib/database-errors.mjs';
 import {validEmail,normalizePhone} from '../lib/validation.mjs';
+import {cropMetadata,estimateLegacyQuality} from '../lib/crop-metadata.mjs';
+test('quality and crop dates reject invalid values, future dates and reversed chronology',()=>{
+ const valid={quality:0,cultivatedDate:'2024-02-29',harvestedDate:'2024-03-01'};
+ assert.deepEqual(cropMetadata(valid),{quality:0,quality_source:'farmer',cultivated_date:'2024-02-29',harvested_date:'2024-03-01'});
+ for(const bad of [{quality:101},{quality:-1},{quality:1.5},{quality:null},{cultivatedDate:'2025-02-29'},{harvestedDate:'2999-01-01'},{harvestedDate:'2024-02-01'},{cultivatedDate:''}])assert.throws(()=>cropMetadata({...valid,...bad}),e=>e.status===400);
+});
+test('legacy quality estimates are labelled, preserve declarations, never invent dates, and run once per missing score',async()=>{
+ const client=createClient({url:':memory:'});
+ try{
+  await migrate(client);const db=databaseAdapter(client);
+  await client.execute("INSERT INTO users(id,name,email,role,created) VALUES('seller','Fixture','fixture@gmail.com','farmer',1)");
+  for(const [id,price,quality,source]of [['low',1000,null,'not_provided'],['higher',2000,null,'not_provided'],['declared',3000,99,'farmer']])await client.execute({sql:"INSERT INTO crops(id,owner_id,name,kind,category,qty,price,place,created,quality,quality_source) VALUES(?,'seller','Tomato','tomato','vegetables',10,?,'Guntur',1,?,?)",args:[id,price,quality,source]});
+  await estimateLegacyQuality(db);
+  const low=await db.prepare("SELECT * FROM crops WHERE id='low'").first(),higher=await db.prepare("SELECT * FROM crops WHERE id='higher'").first();
+  assert.ok(low.quality<higher.quality);assert.equal(low.quality_source,'price_estimate');assert.equal(low.cultivated_date,null);assert.equal(low.harvested_date,null);
+  assert.equal((await db.prepare("SELECT quality FROM crops WHERE id='declared'").first()).quality,99);
+  await client.execute("UPDATE crops SET price=9999 WHERE id='low'");await estimateLegacyQuality(db);
+  assert.equal((await db.prepare("SELECT quality FROM crops WHERE id='low'").first()).quality,low.quality);
+ }finally{client.close()}
+});
 test('requested listing removal is exact, idempotent and preserves accepted trade history',async()=>{
  const client=createClient({url:':memory:'});
  try{

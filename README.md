@@ -7,7 +7,7 @@ Farmer-to-buyer marketplace created by Sherlock Homies for SRM AP Sociothon. Thi
 1. Import `khushgoel-knr/Mitti-Setu` at https://vercel.com/new using your GitHub account. Use the Next.js preset, repository root `./`, Node.js 24.x and the default commands. Do not change Output Directory.
 2. Create a Turso libSQL database at https://app.turso.tech (choose libSQL if asked for an engine). Copy its database URL and create a database access token. Turso also offers a Vercel integration: https://docs.turso.tech/integrations/vercel .
 3. In the Vercel project's Environment Variables, add `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` for Production. Paste each real value there, never in source code or chat. Use a separate database for Preview deployments if you enable them.
-4. Deploy, or redeploy after adding/changing variables. The first API request creates the initial tables and twelve clearly labelled sample listings. Open `/api/health` on the new site: it should return `{"ok":true,"database":true}`. Then test signup, login, adding a crop, sending an offer, and confirming acceptance with separate test accounts.
+4. Deploy, or redeploy after adding/changing variables. The build prepares database migrations and twelve clearly labelled sample listings. Open `/api/health` on the new site: it should return `{"ok":true,"database":true}`. Then test signup, login, adding a crop, sending an offer, and confirming acceptance with separate test accounts.
 5. GitHub stores your source. Vercel builds and hosts it; pushes to the production branch trigger a new deployment. The database persists separately in Turso.
 
 The optional `GEMINI_API_KEY` from Google AI Studio enables crop-photo assessments. Set `GEMINI_MODEL` to an available image-capable model (default `gemini-3.5-flash-lite`). Store keys in Vercel environment variables, never browser code. Google free-tier quota limits apply and free-tier inputs may be used to improve Google services; the upload page discloses this. `PLANT_ID_API_KEY` remains supported as an alternative when Gemini is not configured. Guided crop care works without it. Do not set this to a made-up key.
@@ -20,6 +20,9 @@ Install Node.js 24, then run `npm ci`. Copy `.env.example` to `.env.local`. For 
 
 ## Data and deployment notes
 
+- New and edited crops require a farmer-declared quality score (integer 0–100), cultivation date and harvest date. Dates cannot be in the future; harvest cannot precede cultivation. Historical missing dates remain unknown.
+- Existing active listings without quality receive a one-time price-based estimate (60–90) ranked within the same crop kind and category, or 75 when no comparison exists. This is explicitly labelled and is not a quality inspection or certification.
+- Seller trust is the average buyer rating (0–5) across accepted offers. Only that offer's buyer can review, after confirming receipt; each offer has one editable review. Sellers without reviews remain unrated.
 - This is a fresh database deployment. Existing Cloudflare and Desktop accounts/data are not automatically transferred. The original online site and offline Desktop edition remain independent.
 - `.env*`, database files, node_modules, build files and tests' saved data are excluded by .gitignore. Only `.env.example` contains placeholder configuration.
 - Password hashes and session tokens are private; listing names, seller names and photos are public. No email verification, password recovery, payment processing or delivery booking is integrated yet.
