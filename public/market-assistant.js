@@ -49,7 +49,7 @@ async function fillVoiceDraft(){
   if(result.fields.kind&&!result.fields.category)form.elements.category.value=result.fields.kind==='rice'?'grains':['mango','banana'].includes(result.fields.kind)?'fruits':'vegetables';
   $('#quality-value').textContent=form.elements.quality.value;$('#harvested-date').min=form.elements.cultivatedDate.value||'1900-01-01';
   if(!cropDraftPhoto)$('#listing-preview').innerHTML=cropVisual({kind:form.elements.kind.value,name:form.elements.name.value});
-  if(result.transcript)$('#voice-text').value=result.transcript;$('#voice-status').textContent=t(filled?'draftReview':'draftEmpty');
+  if(result.transcript)$('#voice-text').value=result.transcript;voiceBlob=null;$('#voice-status').textContent=t(filled?'draftReview':'draftEmpty');
  }catch(e){if(form.isConnected)$('#voice-status').textContent=e.message}finally{if(generation===voiceGeneration){voiceBusy=false;if(button.isConnected)button.disabled=false}}
 }
 async function audioAsWav(blob){
