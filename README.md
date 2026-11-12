@@ -1,6 +1,6 @@
 # Mitti Setu
 
-Farmer-to-buyer marketplace created by Mr. Khush Goel for SRM AP Sociothon. This edition targets GitHub + Vercel, using Next.js and a hosted Turso **libSQL** database.
+Farmer-to-buyer marketplace created by Sherlock Homies for SRM AP Sociothon. This edition targets GitHub + Vercel, using Next.js and a hosted Turso **libSQL** database.
 
 ## First deployment
 
