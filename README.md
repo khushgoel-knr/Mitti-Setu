@@ -12,11 +12,20 @@ Farmer-to-buyer marketplace created by Sherlock Homies for SRM AP Sociothon. Thi
 
 The optional `GEMINI_API_KEY` from Google AI Studio enables crop-photo assessments. Set `GEMINI_MODEL` to an available image-capable model (default `gemini-3.5-flash-lite`). Store keys in Vercel environment variables, never browser code. Google free-tier quota limits apply and free-tier inputs may be used to improve Google services; the upload page discloses this. `PLANT_ID_API_KEY` remains supported as an alternative when Gemini is not configured. Guided crop care works without it. Do not set this to a made-up key.
 
+## Marketplace assistant
+
+The existing server-only `GEMINI_API_KEY` also powers smart marketplace search, crop-description translation and voice/text listing drafts. No extra key or paid billing is enabled. These calls share model quota; ordinary search and manual listing forms remain available on failure.
+
+- Smart search extracts bounded filters and applies them to live database inventory. Locations match listing text; there is no distance/geolocation search.
+- Farmers can record up to 30 seconds, listen locally and explicitly send the audio to fill an editable listing form. Audio is converted to mono 16 kHz WAV, sent only on request and not stored by Mitti Setu. The farmer must review and save. Unknown fields are left unchanged; quality is never inferred by the assistant.
+- Listing details keep the original description alongside an optional English/Hindi/Telugu translation. Translations that change numeric tokens are rejected. Translation caches are bounded and keyed by source text/language.
+- Public AI endpoints are rate limited; drafting requires a farmer session. Text/audio sent to Google uses the existing free-tier data disclosure. No keys reach the browser. Real microphone and language accuracy depend on the user's browser, speech and background noise.
+
 ## Local development of this edition
 
 Install Node.js 24, then run `npm ci`. Copy `.env.example` to `.env.local`. For a disposable local database set `TURSO_DATABASE_URL=file:.test-data/local.sqlite` and leave `TURSO_AUTH_TOKEN` blank; create `.test-data` first. Run `npm run dev` and open http://localhost:3000. Use real Turso values only when deliberately connecting to that database.
 
-`npm test` checks idempotent schema creation, image blobs, atomic stock changes and batch rollback. `npm run build` checks the production bundle. For an end-to-end local check run `TEST_ORIGIN=http://127.0.0.1:3000 node tests/cloud-smoke.mjs` (set the environment variable using your shell's syntax). This creates local-only test accounts; do not point it at production.
+`npm test` checks schema migrations, image blobs, atomic stock changes, ratings, crop analysis and marketplace assistant extraction, filtering, translations, permissions and failures. `npm run build` checks the production bundle. For an end-to-end local check run `TEST_ORIGIN=http://127.0.0.1:3000 node tests/cloud-smoke.mjs` (set the environment variable using your shell's syntax). This creates local-only test accounts; do not point it at production.
 
 ## Data and deployment notes
 
