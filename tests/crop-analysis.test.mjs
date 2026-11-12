@@ -18,7 +18,7 @@ test('unclear, non-plant and healthy reports do not invent disease suggestions',
  assert.throws(()=>normalizeGeminiReport({...report,observations:'invalid'}),/incomplete/);
 });
 test('provider failures are safe, actionable and do not reveal credentials or provider payloads',async()=>{
- for(const status of [401,403,404,429,500])await assert.rejects(analyseWithGemini(image,{key:'fake-test-secret',fetcher:async()=>Response.json({error:{message:'fake-test-secret private provider detail'}},{status})}),e=>e.status===(status===429?429:502)&&!e.message.includes('fake-test-secret'));
+ for(const status of [400,401,403,404,429,500])await assert.rejects(analyseWithGemini(image,{key:'fake-test-secret',fetcher:async()=>Response.json({error:{message:'fake-test-secret private provider detail'}},{status})}),e=>e.status===(status===429?429:502)&&!e.message.includes('fake-test-secret'));
  await assert.rejects(analyseWithGemini(image,{key:'fake-test-secret',fetcher:async()=>{throw Object.assign(new Error('private URL'),{name:'AbortError'})}}),e=>e.status===504);
  await assert.rejects(analyseWithGemini('not-an-image',{key:'fake-test-secret',fetcher:()=>{throw Error('must not call provider')}}),e=>e.status===400);
  await assert.rejects(analyseWithGemini(image,{key:'fake-test-secret',fetcher:async()=>Response.json({candidates:[{finishReason:'MAX_TOKENS',content:{parts:[{text:'partial'}]}}]})}),/complete crop report/);
