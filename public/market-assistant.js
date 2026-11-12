@@ -16,46 +16,11 @@ async function runSmartSearch(){
  try{const result=await api('/api/assistant/search','POST',{text,language:lang});if(request===smartRequest&&query.trim()===text){smartResult=result;category='all'}}catch(e){if(request===smartRequest)smartError=e.message}finally{if(request===smartRequest){smartBusy=false;if(route()==='market')render()}}
 }
 function resetSmartSearch(){smartRequest++;smartResult=null;smartError='';smartBusy=false}
-function voiceListingControls(){return `<details class="voice-listing"><summary>${t('voiceTitle')}</summary><p>${t('voiceHint')}</p><p class="small-note">${t('assistantConsent')} ${t('audioConsent')}</p><div class="voice-controls">${action('assistRecord',t('record'),'btn small secondary')}${action('assistClearAudio',t('removeAudio'),'btn small secondary')}</div><div id="voice-playback"></div><label>${t('draftText')}<textarea id="voice-text" maxlength="1800" rows="2" placeholder="${t('draftPlaceholder')}"></textarea></label>${action('assistFill',t('fillDraft'),'btn small')}<p id="voice-status" role="status" aria-live="polite"></p></details>`}
-function discardVoice(){
- voiceGeneration++;clearTimeout(voiceTimer);voiceTimer=null;
- if(voiceRecorder){voiceRecorder.onstop=null;voiceRecorder.ondataavailable=null;if(voiceRecorder.state!=='inactive')voiceRecorder.stop()}
- voiceStream?.getTracks().forEach(track=>track.stop());voiceStream=null;voiceRecorder=null;voiceBlob=null;voiceForm=null;voiceBusy=false;
- if(voiceURL)URL.revokeObjectURL(voiceURL);voiceURL='';
-}
-function clearVoiceAudio(){discardVoice();if($('#voice-playback'))$('#voice-playback').replaceChildren();if($('#voice-status'))$('#voice-status').textContent='';const b=$('[data-action="assistRecord"]');if(b)b.textContent=t('record')}
-async function toggleVoiceRecording(){
- if(voiceRecorder?.state==='recording'){voiceRecorder.stop();voiceStream?.getTracks().forEach(track=>track.stop());return}
- if(voiceBusy)return;const form=$('#crop-form');if(!form)return;clearVoiceAudio();voiceForm=form;const generation=voiceGeneration;
- if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined'){$('#voice-status').textContent=t('voiceUnavailable');return}
- try{
-  const stream=await navigator.mediaDevices.getUserMedia({audio:true});if(generation!==voiceGeneration||!form.isConnected||!$('#modal').open){stream.getTracks().forEach(track=>track.stop());return}
-  voiceStream=stream;const mime=['audio/webm','audio/mp4','audio/ogg'].find(type=>MediaRecorder.isTypeSupported(type));if(!mime)throw Error('unsupported');
-  const chunks=[];voiceRecorder=new MediaRecorder(stream,{mimeType:mime,audioBitsPerSecond:48000});let bytes=0;
-  voiceRecorder.ondataavailable=e=>{if(e.data.size){chunks.push(e.data);bytes+=e.data.size;if(bytes>1400000&&voiceRecorder?.state==='recording')voiceRecorder.stop()}};
-  voiceRecorder.onerror=()=>{clearVoiceAudio();if($('#voice-status'))$('#voice-status').textContent=t('voiceUnavailable')};
-  voiceRecorder.onstop=()=>{clearTimeout(voiceTimer);stream.getTracks().forEach(track=>track.stop());if(generation!==voiceGeneration||!form.isConnected)return;voiceBlob=new Blob(chunks,{type:mime});voiceURL=URL.createObjectURL(voiceBlob);const audio=document.createElement('audio');audio.controls=true;audio.src=voiceURL;$('#voice-playback').replaceChildren(audio);$('#voice-status').textContent=t('audioReady');$('[data-action="assistRecord"]').textContent=t('record')};
-  voiceRecorder.start(500);$('[data-action="assistRecord"]').textContent=t('stopRecord');$('#voice-status').textContent=t('recording');voiceTimer=setTimeout(()=>{if(voiceRecorder?.state==='recording')voiceRecorder.stop()},30000);
- }catch{voiceStream?.getTracks().forEach(track=>track.stop());if(form.isConnected)$('#voice-status').textContent=t('micDenied')}
-}
-async function fillVoiceDraft(){
- const form=$('#crop-form');if(!form||voiceBusy)return;if(voiceRecorder?.state==='recording')throw Error(t('stopFirst'));
- const text=$('#voice-text').value.trim();if(!voiceBlob&&!text)throw Error(t('draftNeedsInput'));
- const generation=voiceGeneration,button=$('[data-action="assistFill"]');voiceBusy=true;button.disabled=true;$('#voice-status').textContent=t('fillingDraft');
- try{
-  const audio=voiceBlob?await audioAsWav(voiceBlob):undefined;
-  const result=await api('/api/assistant/draft','POST',{audio,text,language:lang});if(generation!==voiceGeneration||!form.isConnected)return;
-  let filled=0;for(const [key,value]of Object.entries(result.fields)){const field=form.elements.namedItem(key);if(value!==null&&value!==''&&field){field.value=String(value);filled++}}
-  if(result.fields.kind&&!result.fields.category)form.elements.category.value=result.fields.kind==='rice'?'grains':['mango','banana'].includes(result.fields.kind)?'fruits':'vegetables';
-  $('#quality-value').textContent=form.elements.quality.value;$('#harvested-date').min=form.elements.cultivatedDate.value||'1900-01-01';
-  if(!cropDraftPhoto)$('#listing-preview').innerHTML=cropVisual({kind:form.elements.kind.value,name:form.elements.name.value});
-  if(result.transcript)$('#voice-text').value=result.transcript;voiceBlob=null;$('#voice-status').textContent=t(filled?'draftReview':'draftEmpty');
- }catch(e){if(form.isConnected)$('#voice-status').textContent=e.message}finally{if(generation===voiceGeneration){voiceBusy=false;if(button.isConnected)button.disabled=false}}
-}
+function voiceListingControls(context='listing'){return `<details class="voice-listing"><summary>${t(context==='monitor'?'monitorVoice':'voiceTitle')}</summary><p>${t(context==='monitor'?'monitorVoiceHint':'voiceHint')}</p><p class="small-note">${t('noVoiceCutoff')}</p><p class="small-note">${t('assistantConsent')} ${t('audioConsent')}</p><div class="voice-controls">${action('assistRecord',t('record'),'btn small secondary')}${action('assistClearAudio',t('removeAudio'),'btn small secondary')}</div><div id="voice-playback"></div><label>${t(context==='monitor'?'farmDraftText':'draftText')}<textarea id="voice-text" maxlength="1000000" rows="2" placeholder="${context==='monitor'?'':t('draftPlaceholder')}"></textarea></label>${action('assistFill',t('fillDraft'),'btn small')}<p id="voice-status" role="status" aria-live="polite"></p></details>`}
 async function audioAsWav(blob){
  const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)throw Error(t('voiceUnavailable'));const context=new Audio();
  try{
-  const decoded=await context.decodeAudioData(await blob.arrayBuffer());if(decoded.duration>31)throw Error(t('voiceUnavailable'));
+  const decoded=await context.decodeAudioData(await blob.arrayBuffer());
   const offline=new OfflineAudioContext(1,Math.ceil(decoded.duration*16000),16000),source=offline.createBufferSource();source.buffer=decoded;source.connect(offline.destination);source.start();const rendered=await offline.startRendering(),samples=rendered.getChannelData(0),buffer=new ArrayBuffer(44+samples.length*2),view=new DataView(buffer);
   const text=(offset,str)=>{for(let i=0;i<str.length;i++)view.setUint8(offset+i,str.charCodeAt(i))};text(0,'RIFF');view.setUint32(4,36+samples.length*2,true);text(8,'WAVE');text(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,16000,true);view.setUint32(28,32000,true);view.setUint16(32,2,true);view.setUint16(34,16,true);text(36,'data');view.setUint32(40,samples.length*2,true);for(let i=0;i<samples.length;i++){const n=Math.max(-1,Math.min(1,samples[i]));view.setInt16(44+i*2,n<0?n*32768:n*32767,true)}
   return await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error(t('voiceUnavailable')));reader.readAsDataURL(new Blob([buffer],{type:'audio/wav'}))});
